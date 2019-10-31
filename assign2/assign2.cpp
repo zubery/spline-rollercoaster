@@ -1,4 +1,5 @@
 /*
+  Ryan Zubery
   CSCI 480
   Assignment 2
  */
@@ -29,6 +30,48 @@ struct spline *g_Splines;
 /* total number of splines */
 int g_iNumOfSplines;
 
+//window width and height
+float width = 640.0; 
+float height = 480.0; 
+
+void myinit()
+{
+  /* setup gl view here */
+  glClearColor(0.0, 0.0, 0.0, 0.0);
+
+  //enable depth buffering
+  glEnable(GL_DEPTH_TEST); 
+}
+
+void display()
+{
+    //clear buffers
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
+
+  //clear matrix
+  glLoadIdentity(); 
+
+  //look at matrix
+  gluLookAt(0.0, 0.0, 175.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
+  //swap buffers
+  glutSwapBuffers(); 
+}
+
+void reshape(int w, int h)
+{
+  //set up image size
+  glViewport(0, 0, width, height);
+
+  //projection related changes, sets field of view to 60 degrees
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();  
+  gluPerspective(60.0, width/height, 0.5, 300.0); 
+
+  //modelview related changes
+  glMatrixMode(GL_MODELVIEW); 
+  glLoadIdentity(); 
+}
 
 int loadSplines(char *argv) {
   char *cName = (char *)malloc(128 * sizeof(char));
@@ -91,5 +134,25 @@ int main (int argc, char ** argv)
   }
 
   loadSplines(argv[1]);
+
+  glutInit(&argc,argv);
+
+  //creates a window that's double buffered and with depth testing
+  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH); 
+  glutInitWindowPosition(0, 0); 
+  glutInitWindowSize(width, height); 
+  glutCreateWindow("Ryan's Assignment 2"); 
+
+  /* tells glut to use a particular display function to redraw */
+  glutDisplayFunc(display);
+
+  //tells glut to use a particular reshape function
+  glutReshapeFunc(reshape); 
+
+  /* do initialization */
+  myinit();
+
+  glutMainLoop();
+
   return 0;
 }
