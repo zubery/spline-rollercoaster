@@ -31,6 +31,12 @@ float height = 480.0;
 /* total number of splines */
 int g_iNumOfSplines;
 
+Pic * groundData;
+Pic * skyData;
+
+GLuint gTexName;
+GLuint sTexName;
+
 /* represents one control point along the spline */
 struct point {
    double x;
@@ -83,6 +89,35 @@ point catmullRom(double u, struct point p1, struct point p2, struct point p3,
   return crPoint;
 }
 
+void initTexture()
+{
+  groundData = jpeg_read("ground.jpg", NULL);
+
+  glGenTextures(1, &gTexName);
+  glBindTexture(GL_TEXTURE_2D, gTexName);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, groundData->pix);
+
+  skyData = jpeg_read("sky.jpg", NULL);
+
+  glGenTextures(1, &sTexName);
+  glBindTexture(GL_TEXTURE_2D, sTexName);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, skyData->pix);
+}
+
 void myinit()
 {
   /* setup gl view here */
@@ -101,17 +136,78 @@ void display()
   glLoadIdentity(); 
 
   //look at matrix
-  gluLookAt(0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+  gluLookAt(0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
-  glScalef(0.5 * g_vLandScale[0], 0.5  * g_vLandScale[1], 
-    0.5  * g_vLandScale[2]); 
+  glScalef(g_vLandScale[0], g_vLandScale[1], g_vLandScale[2]); 
 
-  glTranslatef(g_vLandTranslate[0] * 0.5, g_vLandTranslate[1] * 0.5, 
-    g_vLandTranslate[2] * 0.5); 
+  glTranslatef(g_vLandTranslate[0], g_vLandTranslate[1], g_vLandTranslate[2]); 
 
   glRotatef(g_vLandRotate[0], 1.0, 0.0, 0.0); 
   glRotatef(g_vLandRotate[1], 0.0, 1.0, 0.0); 
   glRotatef(g_vLandRotate[2], 0.0, 0.0, 1.0); 
+
+  //GROUND
+  glBindTexture(GL_TEXTURE_2D, gTexName);
+  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+  glEnable(GL_TEXTURE_2D);
+
+  glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 0.0, 50.0);
+    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 0.0, -50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 0.0, -50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 0.0, 50.0);
+  glEnd();
+
+  glDisable(GL_TEXTURE_2D);
+  //GROUND
+
+  //SKY
+  glBindTexture(GL_TEXTURE_2D, sTexName);
+  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+  glEnable(GL_TEXTURE_2D);
+
+  //right side
+  glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 50.0, 50.0);
+    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(50.0, 0.0, -50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(50.0, 0.0, 50.0);
+  glEnd();
+
+  //left side
+  glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 0.0); glVertex3d(-50.0, 50.0, 50.0);
+    glTexCoord2d(0.0, 1.0); glVertex3d(-50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 0.0, -50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 0.0, 50.0);
+  glEnd();
+
+  //front side
+  glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 0.0, 50.0);
+    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, 50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 50.0, 50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 0.0, 50.0);
+  glEnd();
+
+  //back side
+  glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 0.0, -50.0);
+    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 0.0, -50.0);
+  glEnd();
+
+  //top size
+  glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 50.0, 50.0);
+    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 50.0, 50.0);
+  glEnd();
+
+  glDisable(GL_TEXTURE_2D);
+  //Sky
 
   glBegin(GL_POLYGON);
         glVertex3f(0.0, 0.0, 0.0);
@@ -123,11 +219,9 @@ void display()
 
   for(int i = 0; i < g_iNumOfSplines; i++)
   {
-    //glLineWidth(0.5f);
+    glLineWidth(10.0f);
     glBegin(GL_LINE_STRIP);
-    std::cout << g_Splines[i].numControlPoints << std::endl;
 
-    
     for(int j = 1; j < g_Splines[i].numControlPoints - 2; j++)
     {
       struct point p1 = g_Splines[i].points[j - 1];
@@ -135,23 +229,11 @@ void display()
       struct point p3 = g_Splines[i].points[j + 1];
       struct point p4 = g_Splines[i].points[j + 2];
 
-      std::cout << "j: " << j << std::endl;
-      //std::cout << p1.x << ", " << p1.y << ", " << p1.z << std::endl;
-      //std::cout << p2.x << ", " << p2.y << ", " << p2.z << std::endl;
-      //std::cout << p3.x << ", " << p3.y << ", " << p3.z << std::endl;
-      //std::cout << p4.x << ", " << p4.y << ", " << p4.z << std::endl;
-
-      //std::cout << "alive" << std::endl;
-
       for(double u = 0; u <= 1.0; u += 0.01)
       {
         struct point mPoint = catmullRom(u, p1, p2, p3, p4);
-
-        std::cout << mPoint.x << ", " << mPoint.y << ", " << mPoint.z << std::endl;
-
         glVertex3d(mPoint.x, mPoint.y, mPoint.z);
       }
-      std::cout << "yikes" << std::endl;
     }
     glEnd();
   }
@@ -163,7 +245,7 @@ void display()
 void reshape(int w, int h)
 {
   //set up image size
-  glViewport(0, 0, width, height);
+  glViewport(0, 0, width * 2, height * 2);
 
   //projection related changes, sets field of view to 60 degrees
   glMatrixMode(GL_PROJECTION);
@@ -319,7 +401,7 @@ int loadSplines(char *argv) {
 	   &g_Splines[j].points[i].x, 
 	   &g_Splines[j].points[i].y, 
 	   &g_Splines[j].points[i].z) != EOF) {
-       /*std::cout << g_Splines[j].points[i].x << ", " << g_Splines[j].points[i].y << ", " << g_Splines[j].points[i].z << std::endl; */
+       std::cout << g_Splines[j].points[i].x << ", " << g_Splines[j].points[i].y << ", " << g_Splines[j].points[i].z << std::endl; 
       i++;
     }
   }
@@ -347,6 +429,8 @@ int main (int argc, char ** argv)
   glutInitWindowPosition(0, 0); 
   glutInitWindowSize(width, height); 
   glutCreateWindow("Ryan's Assignment 2"); 
+
+  initTexture();
 
   /* tells glut to use a particular display function to redraw */
   glutDisplayFunc(display);
