@@ -115,7 +115,7 @@ void Tangent(double u, struct point p1, struct point p2, struct point p3,
   struct point p4)
 {
   struct point crPoint = catmullRom(u, p1, p2, p3, p4);
-  eyeX = crPoint.x;
+  eyeX = crPoint.x + 1.0;
   eyeY = crPoint.y;
   eyeZ = crPoint.z;
 
@@ -395,8 +395,8 @@ void display()
 
       glLineWidth(50.0f);
       glBegin(GL_LINE_STRIP);
-        glVertex3d(mPoint.x - 1.0, mPoint.y, mPoint.z);
-        glVertex3d(mPoint.x + 1.0, mPoint.y, mPoint.z);
+        glVertex3d(mPoint.x - 0.25, mPoint.y, mPoint.z);
+        glVertex3d(mPoint.x + 2.25, mPoint.y, mPoint.z);
       glEnd();
     }
   }
@@ -417,7 +417,7 @@ void display()
       for(double u = 0; u <= 1.0; u += 0.01)
       {
         struct point mPoint = catmullRom(u, p1, p2, p3, p4);
-        glVertex3d(mPoint.x + 5.0, mPoint.y, mPoint.z);
+        glVertex3d(mPoint.x + 2.0, mPoint.y, mPoint.z);
       }
     }
     glEnd();
