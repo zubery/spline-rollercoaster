@@ -1,0 +1,1 @@
+g++ -c -O3 -I/Users/zubery/github/spline-rollercoaster/pic assign2.cpp

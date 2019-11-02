@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <cmath>
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
 #include <GLUT/glut.h>
@@ -31,11 +32,32 @@ float height = 480.0;
 /* total number of splines */
 int g_iNumOfSplines;
 
+int indexI = 0; 
+int indexJ = 1;
+double indexU = 0.0;
+
+double eyeX = 0.0;
+double eyeY = 50.0;
+double eyeZ = 0.0;
+double forwardX = 0.0;
+double forwardY = 0.0;
+double forwardZ = 0.0;
+double upX = 0.0;
+double upY = 1.0;
+double upZ = 0.0;
+double bX = 0.0;
+double bY = 0.0;
+double bZ = 0.0;
+
 Pic * groundData;
 Pic * skyData;
+Pic * ceilingData;
 
 GLuint gTexName;
 GLuint sTexName;
+GLuint cTexName;
+
+bool doAnimation = false;
 
 /* represents one control point along the spline */
 struct point {
@@ -89,6 +111,94 @@ point catmullRom(double u, struct point p1, struct point p2, struct point p3,
   return crPoint;
 }
 
+void Tangent(double u, struct point p1, struct point p2, struct point p3,
+  struct point p4)
+{
+  struct point crPoint = catmullRom(u, p1, p2, p3, p4);
+  eyeX = crPoint.x;
+  eyeY = crPoint.y;
+  eyeZ = crPoint.z;
+
+  //MATH FOR MOVING THE CAMERA
+
+  point crPointDeriv;
+
+  double s = 0.5;
+  double uCubedDeriv = 3 * u * u;
+  double uSquaredDeriv = 2 * u; 
+
+    double coefficientAndBasisDeriv[4] = 
+    {(uCubedDeriv * -s) + (uSquaredDeriv * 2 * s) + (1 * -s) + (0),
+      (uCubedDeriv * (2 - s)) + (uSquaredDeriv * (s - 3)) + (0) + (0), 
+      (uCubedDeriv * (s - 2)) + (uSquaredDeriv * (3 - 2 * s)) + (1 * s) + (0),
+      (uCubedDeriv * s) + (uSquaredDeriv * -s) + (0) + (0)};
+
+  double cb1D = coefficientAndBasisDeriv[0];
+  double cb2D = coefficientAndBasisDeriv[1];
+  double cb3D = coefficientAndBasisDeriv[2];
+  double cb4D = coefficientAndBasisDeriv[3];
+
+  double pOfUDeriv[3] = 
+  {(cb1D * p1.x) + (cb2D * p2.x) + (cb3D * p3.x) + (cb4D * p4.x), 
+    (cb1D * p1.y) + (cb2D * p2.y) + (cb3D * p3.y) + (cb4D * p4.y), 
+    (cb1D * p1.z) + (cb2D * p2.z) + (cb3D * p3.z) + (cb4D * p4.z)};
+
+  crPointDeriv.x = pOfUDeriv[0];
+  crPointDeriv.y = pOfUDeriv[1];
+  crPointDeriv.z = pOfUDeriv[2];
+
+  double magnitude = sqrt((crPointDeriv.x * crPointDeriv.x) + (crPointDeriv.y * crPointDeriv.y) + (crPointDeriv.z * crPointDeriv.z));
+  double tanX = crPointDeriv.x / magnitude;
+  double tanY = crPointDeriv.y / magnitude;
+  double tanZ = crPointDeriv.z / magnitude;
+
+  std::cout << "x: " << tanX << ", y: " << tanY << ", z: " << tanZ << std::endl;
+
+  forwardX = tanX + eyeX;
+  forwardY = tanY + eyeY;
+  forwardZ = tanZ + eyeZ;
+
+  if(u == 0.0)
+  {
+    struct point v;
+    v.x = 1.0;
+    v.y = 0.0;
+    v.z = 0.0;
+
+    //T x V
+    upX = (tanY * v.z) - (tanZ * v.y);
+    upY = (tanZ * v.x) - (tanX * v.z);
+    upZ = (tanX * v.y) - (tanY * v.x);
+
+    //T x N
+    bX = (tanY * upZ) - (tanZ * upY);
+    bY = (tanZ * upX) - (tanX * upZ);
+    bZ = (tanX * upY) - (tanY * upX);
+  }
+  else
+  {
+    //B0 x T1
+    upX = (bY * tanZ) - (bZ * tanY);
+    upY = (bZ * tanX) - (bX * tanZ); 
+    upZ = (bX * tanY) - (bY * tanX);
+
+    //T1 x N1
+    bX = (tanY * upZ) - (tanZ * upY);
+    bY = (tanZ * upX) - (tanX * upZ);
+    bZ = (tanX * upY) - (tanY * upX);
+  }
+
+  double upMagnitude = sqrt((upX * upX) + (upY * upY) + (upZ * upZ));
+  upX /= upMagnitude;
+  upY /= upMagnitude;
+  upZ /= upMagnitude;
+
+  double bMagnitude = sqrt((bX * bX) + (bY * bY) + (bZ * bZ));
+  bX /= bMagnitude;
+  bY /= bMagnitude;
+  bZ /= bMagnitude;
+}
+
 void initTexture()
 {
   groundData = jpeg_read("ground.jpg", NULL);
@@ -102,7 +212,7 @@ void initTexture()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, groundData->pix);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 512, 512, 0, GL_RGB, GL_UNSIGNED_BYTE, groundData->pix);
 
   skyData = jpeg_read("sky.jpg", NULL);
 
@@ -115,7 +225,20 @@ void initTexture()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, skyData->pix);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 512, 512, 0, GL_RGB, GL_UNSIGNED_BYTE, skyData->pix);
+
+  ceilingData = jpeg_read("ceiling.jpg", NULL);
+
+  glGenTextures(1, &cTexName);
+  glBindTexture(GL_TEXTURE_2D, cTexName);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 512, 512, 0, GL_RGB, GL_UNSIGNED_BYTE, ceilingData->pix);
 }
 
 void myinit()
@@ -136,7 +259,15 @@ void display()
   glLoadIdentity(); 
 
   //look at matrix
-  gluLookAt(0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+  if(doAnimation)
+  {
+  gluLookAt(eyeX, eyeY, eyeZ, forwardX, forwardY, forwardZ, upX, upY, upZ);
+  }
+  else
+  {
+    gluLookAt(0.0, 50.0, 10.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+  }
+
 
   glScalef(g_vLandScale[0], g_vLandScale[1], g_vLandScale[2]); 
 
@@ -145,7 +276,7 @@ void display()
   glRotatef(g_vLandRotate[0], 1.0, 0.0, 0.0); 
   glRotatef(g_vLandRotate[1], 0.0, 1.0, 0.0); 
   glRotatef(g_vLandRotate[2], 0.0, 0.0, 1.0); 
-
+  
   //GROUND
   glBindTexture(GL_TEXTURE_2D, gTexName);
   glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
@@ -168,54 +299,60 @@ void display()
 
   //right side
   glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 0.0, 50.0);
     glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 50.0, 50.0);
-    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, -50.0);
-    glTexCoord2d(1.0, 0.0); glVertex3d(50.0, 0.0, -50.0);
-    glTexCoord2d(1.0, 1.0); glVertex3d(50.0, 0.0, 50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(50.0, 0.0, -50.0);
   glEnd();
 
   //left side
   glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 1.0); glVertex3d(-50.0, 00.0, 50.0);
     glTexCoord2d(0.0, 0.0); glVertex3d(-50.0, 50.0, 50.0);
-    glTexCoord2d(0.0, 1.0); glVertex3d(-50.0, 50.0, -50.0);
-    glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 0.0, -50.0);
-    glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 0.0, 50.0);
-  glEnd();
-
-  //front side
-  glBegin(GL_QUADS);
-    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 0.0, 50.0);
-    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, 50.0);
-    glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 50.0, 50.0);
-    glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 0.0, 50.0);
-  glEnd();
-
-  //back side
-  glBegin(GL_QUADS);
-    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 0.0, -50.0);
-    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, -50.0);
     glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 50.0, -50.0);
     glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 0.0, -50.0);
   glEnd();
 
-  //top size
+  //front side
   glBegin(GL_QUADS);
-    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 50.0, 50.0);
-    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, -50.0);
+    glTexCoord2d(0.0, 1.0); glVertex3d(-50.0, 0.0, 50.0);
+    glTexCoord2d(0.0, 0.0); glVertex3d(-50.0, 50.0, 50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(50.0, 50.0, 50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(50.0, 0.0, 50.0);
+  glEnd();
+
+  //back side
+  glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 1.0); glVertex3d(-50.0, 0.0, -50.0);
+    glTexCoord2d(0.0, 0.0); glVertex3d(-50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 0.0); glVertex3d(50.0, 50.0, -50.0);
+    glTexCoord2d(1.0, 1.0); glVertex3d(50.0, 0.0, -50.0);
+  glEnd();
+
+  glDisable(GL_TEXTURE_2D);
+  //SKY
+
+  //CEILING
+  glBindTexture(GL_TEXTURE_2D, cTexName);
+  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+  glEnable(GL_TEXTURE_2D);
+
+  glBegin(GL_QUADS);
+    glTexCoord2d(0.0, 1.0); glVertex3d(50.0, 50.0, 50.0);
+    glTexCoord2d(0.0, 0.0); glVertex3d(50.0, 50.0, -50.0);
     glTexCoord2d(1.0, 0.0); glVertex3d(-50.0, 50.0, -50.0);
     glTexCoord2d(1.0, 1.0); glVertex3d(-50.0, 50.0, 50.0);
   glEnd();
 
   glDisable(GL_TEXTURE_2D);
-  //Sky
+  //CEILING
 
   glBegin(GL_POLYGON);
-        glVertex3f(0.0, 0.0, 0.0);
-        glVertex3f(0.5, 0.0, 0.0);
-        glVertex3f(0.5, 0.5, 0.0);
-        glVertex3f(0.0, 0.5, 0.0);
+        glTexCoord2d(0.0, 1.0); glVertex3f(0.0, 0.0, 0.0);
+        glTexCoord2d(0.0, 0.0); glVertex3f(0.0, 1.0, 0.0);
+        glTexCoord2d(1.0, 0.0); glVertex3f(1.0, 1.0, 0.0);
+        glTexCoord2d(1.0, 1.0); glVertex3f(1.0, 0.0, 0.0);
     glEnd();
-
 
   for(int i = 0; i < g_iNumOfSplines; i++)
   {
@@ -259,6 +396,36 @@ void reshape(int w, int h)
 
 void doIdle()
 {
+  if(doAnimation)
+  {
+    if(indexI < g_iNumOfSplines)
+    {
+      if(indexJ < g_Splines[indexI].numControlPoints - 2)
+      {
+        struct point p1 = g_Splines[indexI].points[indexJ - 1];
+        struct point p2 = g_Splines[indexI].points[indexJ];
+        struct point p3 = g_Splines[indexI].points[indexJ + 1];
+        struct point p4 = g_Splines[indexI].points[indexJ + 2];
+
+        if(indexU <= 1.0)
+        {
+          Tangent(indexU, p1, p2, p3, p4);
+          indexU += 0.01;
+        }
+        else
+        {
+          indexU = 0.0;
+          indexJ++;
+        }
+      }
+      else
+      {
+        indexJ = 1;
+        indexI++;
+      }
+    }
+  }
+
   /* make the screen update */
   glutPostRedisplay();
 }
@@ -356,6 +523,11 @@ void keyboard(unsigned char key, int x, int y)
   else if(key == 'e')
   {
     g_ControlState = TRANSLATE;
+  }
+
+  if(key == 'x')
+  {
+    doAnimation = !doAnimation;
   }
 }
 
