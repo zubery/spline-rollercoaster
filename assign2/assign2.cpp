@@ -152,11 +152,11 @@ void Tangent(double u, struct point p1, struct point p2, struct point p3,
   double tanY = crPointDeriv.y / magnitude;
   double tanZ = crPointDeriv.z / magnitude;
 
-  std::cout << "x: " << tanX << ", y: " << tanY << ", z: " << tanZ << std::endl;
-
   forwardX = tanX + eyeX;
   forwardY = tanY + eyeY;
   forwardZ = tanZ + eyeZ;
+
+  std::cout << "x: " << forwardX << ", y: " << forwardY << ", z: " << forwardZ << std::endl;
 
   if(u == 0.0)
   {
@@ -347,16 +347,20 @@ void display()
   glDisable(GL_TEXTURE_2D);
   //CEILING
 
+  //helper square
+  /*
   glBegin(GL_POLYGON);
         glTexCoord2d(0.0, 1.0); glVertex3f(0.0, 0.0, 0.0);
         glTexCoord2d(0.0, 0.0); glVertex3f(0.0, 1.0, 0.0);
         glTexCoord2d(1.0, 0.0); glVertex3f(1.0, 1.0, 0.0);
         glTexCoord2d(1.0, 1.0); glVertex3f(1.0, 0.0, 0.0);
     glEnd();
+  */
 
+  //rail one
   for(int i = 0; i < g_iNumOfSplines; i++)
   {
-    glLineWidth(10.0f);
+    glLineWidth(50.0f);
     glBegin(GL_LINE_STRIP);
 
     for(int j = 1; j < g_Splines[i].numControlPoints - 2; j++)
@@ -370,6 +374,50 @@ void display()
       {
         struct point mPoint = catmullRom(u, p1, p2, p3, p4);
         glVertex3d(mPoint.x, mPoint.y, mPoint.z);
+      }
+    }
+    glEnd();
+  }
+
+  //bars
+  for(int i = 0; i < g_iNumOfSplines; i++)
+  {
+
+
+    for(int j = 1; j < g_Splines[i].numControlPoints - 2; j++)
+    {
+      struct point p1 = g_Splines[i].points[j - 1];
+      struct point p2 = g_Splines[i].points[j];
+      struct point p3 = g_Splines[i].points[j + 1];
+      struct point p4 = g_Splines[i].points[j + 2];
+
+      struct point mPoint = catmullRom(0, p1, p2, p3, p4);
+
+      glLineWidth(50.0f);
+      glBegin(GL_LINE_STRIP);
+        glVertex3d(mPoint.x - 1.0, mPoint.y, mPoint.z);
+        glVertex3d(mPoint.x + 1.0, mPoint.y, mPoint.z);
+      glEnd();
+    }
+  }
+  
+  //rail two 
+  for(int i = 0; i < g_iNumOfSplines; i++)
+  {
+    glLineWidth(50.0f);
+    glBegin(GL_LINE_STRIP);
+
+    for(int j = 1; j < g_Splines[i].numControlPoints - 2; j++)
+    {
+      struct point p1 = g_Splines[i].points[j - 1];
+      struct point p2 = g_Splines[i].points[j];
+      struct point p3 = g_Splines[i].points[j + 1];
+      struct point p4 = g_Splines[i].points[j + 2];
+
+      for(double u = 0; u <= 1.0; u += 0.01)
+      {
+        struct point mPoint = catmullRom(u, p1, p2, p3, p4);
+        glVertex3d(mPoint.x + 5.0, mPoint.y, mPoint.z);
       }
     }
     glEnd();
